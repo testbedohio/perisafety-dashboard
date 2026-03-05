@@ -22,8 +22,8 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'dist')));
 
 app.post('/api/messages', async (req, res) => {
-  const apiKey    = process.env.ANTHROPIC_API_KEY;
-  const mcpToken  = process.env.N8N_MCP_TOKEN;
+  const apiKey   = process.env.ANTHROPIC_API_KEY;
+  const mcpToken = process.env.N8N_MCP_TOKEN;
 
   if (!apiKey) {
     return res.status(500).json({ error: { message: 'ANTHROPIC_API_KEY is not set.' } });
@@ -34,7 +34,7 @@ app.post('/api/messages', async (req, res) => {
   if (mcpToken && Array.isArray(body.mcp_servers)) {
     body.mcp_servers = body.mcp_servers.map(server => ({
       ...server,
-      authorization: { type: 'bearer', token: mcpToken },
+      headers: { Authorization: `Bearer ${mcpToken}` },
     }));
   }
 
