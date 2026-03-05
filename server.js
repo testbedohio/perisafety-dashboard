@@ -22,10 +22,22 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'dist')));
 
 app.post('/api/messages', async (req, res) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey    = process.env.ANTHROPIC_API_KEY;
+  const mcpToken  = process.env.N8N_MCP_TOKEN;
+
   if (!apiKey) {
-    return res.status(500).json({ error: { message: 'ANTHROPIC_API_KEY is not set. Check your .env file.' } });
+    return res.status(500).json({ error: { message: 'ANTHROPIC_API_KEY is not set.' } });
   }
+
+  // Inject the MCP auth token server-side so it never touches the browser
+  const body = { ...req.body };
+  if (mcpToken && Array.isArray(body.mcp_servers)) {
+    body.mcp_servers = body.mcp_servers.map(server => ({
+      ...server,
+      authorization: { type: 'bearer', token: mcpToken },
+    }));
+  }
+
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -35,7 +47,7 @@ app.post('/api/messages', async (req, res) => {
         'anthropic-version': '2023-06-01',
         'anthropic-beta': 'mcp-client-2025-04-04',
       },
-      body: JSON.stringify(req.body),
+      body: JSON.stringify(body),
     });
     const data = await response.json();
     res.status(response.status).json(data);
@@ -50,6 +62,8 @@ app.get('*', (_req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`\n✅  PeriSafety proxy running → http://localhost:${PORT}`);
-  console.log(`   React dev server         → http://localhost:3000\n`);
+  console.log(`
+霈  PeriSafety proxy running → http://localhost:${PORT}`);
+  console.log(`   React dev server         → http://localhost:3000
+`);
 });
