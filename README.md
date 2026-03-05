@@ -1,118 +1,69 @@
 # PeriSafety Dashboard
 
-**Perioperative Safety Intervention Program — Deployment Dashboard**
+Deployment tracking dashboard for a perioperative safety research program.
 
-> ⚠️ **RESEARCH SOFTWARE ONLY** — Not for clinical use. Not HIPAA certified. PHI must not be stored on this system.
+> ⚠️ Research Software Only · Not for Clinical Use · No PHI
 
----
+## Live App
 
-## What this is
+https://gsv-status-tracker.onrender.com
 
-A web-based dashboard for tracking the deployment of a perioperative safety intervention program across 20 participating clinic sites. It reads and writes data from a Google Sheets database via an n8n automation workflow.
+## Architecture
 
----
+```
+Browser (React/Vite)
+  → /api/messages (Express proxy, server.js)
+  → https://api.anthropic.com/v1/messages (Anthropic API)
+  → n8n MCP server (testbed999.app.n8n.cloud/mcp-server/http)
+  → Google Sheets (Spreadsheet ID: 1otqhLeWFt5W-hUGOE3KbZiGFqCHL6rDAIyJ2DxJBcDc)
+```
 
-## Features
+The Express proxy in `server.js` sits between the browser and Anthropic. This is necessary for two reasons:
+1. It keeps the `ANTHROPIC_API_KEY` off the browser (security)
+2. It injects the `N8N_MCP_TOKEN` into every request server-side (the Anthropic API requires this as `authorization_token` on the `mcp_servers` object)
 
-- **Disclaimer modal** on every page load (required)
-- **Task alert dialogs** for overdue tasks and tasks due within 7 days
-- **Gantt-style deployment chart** showing all 20 clinics and their progress through 5 stages
-- **Task Tracker** — view, search, filter, create, and edit tasks with live Google Sheets sync
-- Color-coded status indicators and priority flags
+## Environment Variables
 
----
+All three variables must be set in Render's Environment dashboard:
 
-## Tech stack
+| Variable | Description | Where to find it |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Anthropic API key | console.anthropic.com → API Keys |
+| `N8N_MCP_TOKEN` | Auth token for the n8n MCP server | n8n Settings → MCP, or the Header Auth credential used by your workflows |
+| `PORT` | Server port (Render sets this automatically) | Set to `10000` on Render |
 
-| Layer | Technology |
-|---|---|
-| UI framework | React 18 + Vite |
-| Data source | Google Sheets (`Main_DB`) |
-| Integration | Anthropic API → n8n MCP → Google Sheets |
-| Language | JavaScript (JSX) |
-| IDE recommended | WebStorm |
+For local development, copy `.env.example` to `.env` and fill in your values.
 
----
+## Render Deployment
 
-## Getting started
+- **Build command:** `npm install --include=dev && npm run build`
+- **Start command:** `npm start`
+- **Port:** 10000
 
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) v18 or higher
-- A package manager: `npm` (comes with Node) or `yarn`
-
-### Install & run
+## Local Development
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/testbedohio/perisafety-dashboard.git
-cd perisafety-dashboard
-
-# 2. Install dependencies
 npm install
-
-# 3. Start the development server
-npm run dev
+cp .env.example .env
+# fill in .env
+npm run dev      # Vite dev server on :3000
+npm start        # Express proxy on :3001
 ```
 
-The app will open automatically at `http://localhost:3000`.
+## Key Files
 
----
-
-## Project structure
-
-```
-perisafety-dashboard/
-├── index.html          # HTML entry point
-├── vite.config.js      # Vite bundler config
-├── package.json        # Project dependencies
-├── .gitignore
-└── src/
-    ├── main.jsx        # React bootstrap (do not edit)
-    └── App.jsx         # ← All application code lives here
-```
-
-All application logic — components, API calls, styling — lives in **`src/App.jsx`**. As the project grows, individual components will be split into separate files under `src/`.
-
----
-
-## Google Sheets structure
-
-**Spreadsheet:** `Main_DB`
-**ID:** `1otqhLeWFt5W-hUGOE3KbZiGFqCHL6rDAIyJ2DxJBcDc`
-
-| Sheet | Purpose |
+| File | Purpose |
 |---|---|
-| `Clinics` | 20 participating sites, deployment stage, dates |
-| `Clinicians` | Clinician research participants |
-| `Patients` | Patient-participants (research IDs only, no PHI) |
-| `Measures&Metrics` | Program monitoring data |
-| `TaskTracker` | Task management with due dates and assignments |
-| `Log_One/Two/Three` | Reserved |
+| `src/App.jsx` | Entire React frontend (~32KB, single file) |
+| `server.js` | Express proxy — forwards `/api/messages` to Anthropic, injects MCP token |
+| `vite.config.js` | Vite build config |
+| `package.json` | Scripts: `build` (vite build), `start` (node server.js) |
 
-### TaskTracker columns
+## Troubleshooting
 
-`Task_ID`, `Task_Description`, `Task_Creation`, `Task_Modified`, `Created_By`, `Modified_By`, `Due_Date`, `Assigned_To`, `Status`, `Priority`, `Clinic_Ref`, `Notes`
-
-> **Add columns G–K manually** if not already present: `Due_Date`, `Assigned_To`, `Status`, `Priority`, `Clinic_Ref`
-
-### Clinics — Deployment_Stage values
-
-Use the format `Stage_1` through `Stage_5` in the `Deployment_Stage` column.
-
----
-
-## Data security notice
-
-- This application contains **no PHI** and is not designed to store any
-- No authentication is implemented — intended for trusted internal research team use only
-- The Anthropic API key is managed externally by the Claude.ai environment
-- All data is stored in Google Sheets under the research team's Google account
-
----
-
-## Development notes
-
-- The app uses the **Anthropic Messages API** (`claude-sonnet-4-20250514`) with an MCP server to talk to Google Sheets via n8n
-- No direct Google Sheets API credentials are embedded in this codebase
-- The n8n workflow URL: `https://testbed999.app.n8n.cloud/mcp-server/http`
+| Error | Cause | Fix |
+|---|---|---|
+| CORS error | App calling Anthropic directly from browser | Ensure `callClaude()` in App.jsx uses `/api/messages`, not the full Anthropic URL |
+| HTTP 401 | Invalid or missing `ANTHROPIC_API_KEY` | Update the key in Render → Environment |
+| HTTP 400 `mcp_servers.0.authorization_token` | Wrong or missing MCP token | Update `N8N_MCP_TOKEN` in Render → Environment |
+| Authentication error from MCP server | Wrong token value | Use the JWT token from n8n Settings → MCP (not the n8n REST API key) |
