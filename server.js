@@ -34,7 +34,7 @@ app.post('/api/messages', async (req, res) => {
   if (mcpToken && Array.isArray(body.mcp_servers)) {
     body.mcp_servers = body.mcp_servers.map(server => ({
       ...server,
-      headers: { Authorization: `Bearer ${mcpToken}` },
+      authorization_token: mcpToken,
     }));
   }
 
